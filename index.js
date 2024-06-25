@@ -6,6 +6,7 @@ const path = require("path");
 
 const token = "7016936881:AAG1_PDvfJx1M5rUqk85CJ-phxo0cCytC18";
 const chatId = "-1002152382917";
+const tagName = "#news_test";
 const app = express();
 const port = 80;
 
@@ -86,7 +87,7 @@ app.get("/get_messages", async (req, res) => {
           const date = formatDate(firstPost.date);
           const caption = firstPost.caption || "";
 
-          if (!caption.includes("#news_test")) {
+          if (!caption.includes(tagName)) {
             return null; // Пропустить сообщения без #news_test
           }
 
