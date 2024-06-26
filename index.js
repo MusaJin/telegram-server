@@ -85,7 +85,7 @@ app.get("/get_messages", async (req, res) => {
         Object.values(groupedMessages).map(async (group) => {
           const firstPost = group[0].channel_post;
           const date = formatDate(firstPost.date);
-          const caption = firstPost.caption || "";
+          let caption = firstPost.caption || "";
 
           if (!caption.endsWith("#news_test")) {
             return null; // Пропустить сообщения без #news_test в конце
