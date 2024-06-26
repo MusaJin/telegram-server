@@ -87,18 +87,21 @@ app.get("/get_messages", async (req, res) => {
           const date = formatDate(firstPost.date);
           const caption = firstPost.caption || "";
 
-          if (!caption.includes(tagName)) {
-            return null; // Пропустить сообщения без #news_test
+          if (!caption.endsWith("#news_test")) {
+            return null; // Пропустить сообщения без #news_test в конце
           }
+
+          // Удалить тег из caption
+          caption = caption.replace("#news_test", "").trim();
 
           // Разбить caption на части
           const parts = caption.split("\n\n");
           let title = "";
           let text = "";
 
-          if (parts.length > 2) {
-            title = parts[1];
-            text = parts.slice(2).join("\n\n");
+          if (parts.length > 1) {
+            title = parts[0];
+            text = parts.slice(1).join("\n\n");
           }
 
           const photos = await Promise.all(
