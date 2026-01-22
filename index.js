@@ -3,12 +3,14 @@ const cors = require("cors");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+const https = require("https");
 
 const token = "7016936881:AAG1_PDvfJx1M5rUqk85CJ-phxo0cCytC18";
-const chatId = "-1002152382917";
-const tagName = "#news_test";
+const chatId = "-1001837227792";
+const tagName = "#web";
 const app = express();
-const port = 80;
+const port = 443;
+
 
 const corsOptions = {
   origin: "*",
@@ -18,6 +20,11 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use("/refs", express.static("static"));
+
+const sslOptions = {
+  key: fs.readFileSync('../../../etc/letsencrypt/live/backend.stardom09.ru/privkey.pem'),
+  cert: fs.readFileSync('../../../etc/letsencrypt/live/backend.stardom09.ru/fullchain.pem')
+};
 
 const downloadPhoto = async (fileId, filePath) => {
   try {
@@ -52,105 +59,127 @@ const formatDate = (timestamp) => {
   return `${year}-${month}-${day}`;
 };
 
-app.get("/get_messages", async (req, res) => {
+const EIGHT_HOURS = 8 * 60 * 60 * 1000; // 8 часов в мс
+
+
+const processUpdate = async () => {
   try {
-    const url = `https://api.telegram.org/bot${token}/getUpdates?chat_id=${chatId}`;
+    const url = `https://api.telegram.org/bot${token}/getUpdates`;
     const response = await axios.get(url);
 
-    if (response.data.ok) {
-      const messages = response.data.result;
+    if (!response.data.ok) {
+      console.error("Ошибка Telegram API:", response.data);
+      return null;
+    }
 
-      const staticDir = path.join(__dirname, "static");
-      if (!fs.existsSync(staticDir)) {
-        fs.mkdirSync(staticDir);
-      }
+    const messages = response.data.result;
 
-      // Группировка сообщений по media_group_id
-      const groupedMessages = {};
-      for (const data of messages) {
-        if (data.channel_post) {
-          const mediaGroupId = data.channel_post.media_group_id;
-          if (mediaGroupId) {
-            if (!groupedMessages[mediaGroupId]) {
-              groupedMessages[mediaGroupId] = [];
-            }
-            groupedMessages[mediaGroupId].push(data);
-          } else {
-            groupedMessages[data.update_id] = [data]; // Уникальный ключ для сообщений без media_group_id
+    const staticDir = path.join(__dirname, "static");
+    if (!fs.existsSync(staticDir)) {
+      fs.mkdirSync(staticDir);
+    }
+
+    const groupedMessages = {};
+    for (const data of messages) {
+      if (data.channel_post) {
+        const mediaGroupId = data.channel_post.media_group_id;
+        if (mediaGroupId) {
+          if (!groupedMessages[mediaGroupId]) {
+            groupedMessages[mediaGroupId] = [];
           }
+          groupedMessages[mediaGroupId].push(data);
+        } else {
+          groupedMessages[data.update_id] = [data];
         }
       }
-
-      const textsAndPhotos = await Promise.all(
-        Object.values(groupedMessages).map(async (group) => {
-          const firstPost = group[0].channel_post;
-          const date = formatDate(firstPost.date);
-          let caption = firstPost.caption || "";
-
-          if (!caption.endsWith("#news_test")) {
-            return null; // Пропустить сообщения без #news_test в конце
-          }
-
-          // Удалить тег из caption
-          caption = caption.replace("#news_test", "").trim();
-
-          // Разбить caption на части
-          const parts = caption.split("\n\n");
-          let title = "";
-          let text = "";
-
-          if (parts.length > 1) {
-            title = parts[0];
-            text = parts.slice(1).join("\n\n");
-          }
-
-          const photos = await Promise.all(
-            group.map(async (data) => {
-              if (data.channel_post.photo) {
-                const photo = data.channel_post.photo[data.channel_post.photo.length - 1];
-                const filePath = path.join(staticDir, `${photo.file_id}.jpg`);
-                await downloadPhoto(photo.file_id, filePath);
-                return `${photo.file_id}.jpg`;
-              }
-              return null;
-            })
-          );
-
-          // Отфильтровать null значения
-          const validPhotos = photos.filter((photo) => photo !== null);
-
-          try {
-            const apiUrl = `http://musaku0d.beget.tech/api/add_news.php?title=${encodeURIComponent(title)}&text=${encodeURIComponent(text)}&img=${validPhotos.join(",")}&date=${date}`;
-            const apiResponse = await axios.get(apiUrl);
-            console.log(apiResponse.data);
-          } catch (error) {
-            console.error(`Проблема с запросом: ${error.message}`);
-          }
-
-          return {
-            message_id: firstPost.message_id,
-            caption,
-            date,
-            title,
-            text,
-            photos: validPhotos.map((fileId) => ({
-              url: `/refs/${fileId}`,
-            })),
-          };
-        })
-      );
-
-      console.log(textsAndPhotos);
-      res.json(textsAndPhotos.filter((item) => item !== null));
-    } else {
-      res.status(500).json({ error: "Не удалось получить сообщения из Telegram API" });
     }
+
+    const textsAndPhotos = await Promise.all(
+      Object.values(groupedMessages).map(async (group) => {
+        const firstPost = group[0].channel_post;
+        const date = formatDate(firstPost.date);
+        let caption = firstPost.caption || "";
+
+        if (!caption.endsWith("#web")) return null;
+
+        caption = caption.replace("#web", "").trim();
+
+        const parts = caption.split("\n\n");
+        let title = "";
+        let text = "";
+
+        if (parts.length > 1) {
+          title = parts[0];
+          text = parts.slice(1).join("\n\n");
+        }
+
+        const photos = await Promise.all(
+          group.map(async (data) => {
+            if (data.channel_post.photo) {
+              const photo =
+                data.channel_post.photo[data.channel_post.photo.length - 1];
+              const filePath = path.join(staticDir, `${photo.file_id}.jpg`);
+              await downloadPhoto(photo.file_id, filePath);
+              return `${photo.file_id}.jpg`;
+            }
+            return null;
+          })
+        );
+
+        const validPhotos = photos.filter(Boolean);
+
+        try {
+          const apiUrl = `https://stardom09.ru/api/add_news.php?title=${encodeURIComponent(
+            title
+          )}&text=${encodeURIComponent(text)}&img=${validPhotos.join(
+            ","
+          )}&date=${date}`;
+          const apiResponse = await axios.get(apiUrl);
+          console.log(apiResponse.data);
+        } catch (error) {
+          console.error(`Проблема с запросом: ${error.message}`);
+        }
+
+        return {
+          message_id: firstPost.message_id,
+          caption,
+          date,
+          title,
+          text,
+          photos: validPhotos.map((fileId) => ({
+            url: `/refs/${fileId}`,
+          })),
+        };
+      })
+    );
+
+    const result = textsAndPhotos.filter(Boolean);
+    console.log(result);
+    return result;
+  } catch (error) {
+    console.error("Ошибка при получении сообщений:", error);
+    throw error;
+  }
+};
+
+app.get("/get_messages", async (req, res) => {
+  try {
+    const data = await processUpdate();
+    console.log("start")
+    res.json({ ok: true, data });
+    console.log("end")
   } catch (error) {
     console.error("Ошибка при получении сообщений:", error);
     res.status(500).json({ error: "Не удалось получить сообщения" });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Сервер запущен на http://localhost:${port}`);
+setInterval(() => {
+  processUpdate().catch((err) => {
+    console.error("Ошибка при получении новости из телеграма", err);
+  });
+}, EIGHT_HOURS);
+
+https.createServer(sslOptions, app).listen(port, () => {
+  console.log(`HTTPS server running on port ${port}`);
 });
