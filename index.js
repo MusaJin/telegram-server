@@ -1,11 +1,20 @@
-const express = require("express");
-const cors = require("cors");
-const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
-const https = require("https");
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import axios from "axios";
+import fs from "fs";
+import path from "path";
+import https from "https";
+import { fileURLToPath } from "url";
 
-const token = "7016936881:AAG1_PDvfJx1M5rUqk85CJ-phxo0cCytC18";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const token = process.env.BOT_TOKEN;
+if (!token) {
+  console.error("BOT_TOKEN is not set");
+  process.exit(1);
+}
 const chatId = "-1001837227792";
 const tagName = "#web";
 const app = express();
