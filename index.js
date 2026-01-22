@@ -20,10 +20,6 @@ const tagName = process.env.TAG_NAME;
 const app = express();
 const port = 443;
 
-console.log(token)
-console.log(chatId)
-console.log(tagName)
-
 
 const corsOptions = {
   origin: "*",
