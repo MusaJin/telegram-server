@@ -15,10 +15,14 @@ if (!token) {
   console.error("BOT_TOKEN is not set");
   process.exit(1);
 }
-const chatId = "-1001837227792";
-const tagName = "#web";
+const chatId = process.env.CHAT_ID;
+const tagName = process.env.TAG_NAME;
 const app = express();
 const port = 443;
+
+console.log(token)
+console.log(chatId)
+console.log(tagName)
 
 
 const corsOptions = {
@@ -109,9 +113,9 @@ const processUpdate = async () => {
         const date = formatDate(firstPost.date);
         let caption = firstPost.caption || "";
 
-        if (!caption.endsWith("#web")) return null;
+        if (!caption.endsWith(tagName)) return null;
 
-        caption = caption.replace("#web", "").trim();
+        caption = caption.replace(tagName, "").trim();
 
         const parts = caption.split("\n\n");
         let title = "";
